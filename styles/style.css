@@ -1,0 +1,368 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0f172a;
+  color: #e5f6ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(125, 211, 252, 0.18), transparent 34rem),
+    linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  color: #e5f6ff;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.85rem 1.2rem;
+  background: rgba(148, 163, 184, 0.22);
+  color: #f8fafc;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.11);
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(125, 211, 252, 0.28);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.app-shell {
+  width: min(960px, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.25rem;
+}
+
+.app-header__brand {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.app-header__note {
+  color: #a8c7d8;
+  font-size: 0.9rem;
+}
+
+.screen {
+  display: none;
+  flex: 1;
+  animation: fadeIn 0.18s ease;
+}
+
+.screen.is-active {
+  display: grid;
+  place-items: center;
+}
+
+.panel {
+  width: min(720px, 100%);
+  border-radius: 28px;
+  padding: clamp(1.2rem, 3vw, 2.2rem);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.32), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.hero {
+  text-align: center;
+}
+
+.hero h1,
+.panel h1,
+.panel h2 {
+  margin: 0 0 0.75rem;
+}
+
+.hero p,
+.panel p {
+  color: #b7d4e5;
+  line-height: 1.7;
+}
+
+.menu-grid {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.9), rgba(129, 140, 248, 0.88));
+  color: white;
+  font-weight: 700;
+}
+
+.secondary-button {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.stage-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.85rem;
+  margin: 1rem 0 1.4rem;
+}
+
+.stage-card {
+  min-height: 126px;
+  border-radius: 20px;
+  padding: 1rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: rgba(30, 41, 59, 0.88);
+}
+
+.stage-card strong {
+  font-size: 1.05rem;
+}
+
+.stage-card span {
+  color: #b7d4e5;
+  font-size: 0.88rem;
+}
+
+.stage-card__number {
+  color: #7dd3fc !important;
+  font-weight: 800;
+}
+
+.is-locked {
+  filter: grayscale(0.6);
+}
+
+.game-screen.is-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.hud {
+  width: min(360px, calc(100vw - 1rem));
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+}
+
+.hud__item {
+  min-width: 0;
+  border-radius: 14px;
+  padding: 0.48rem 0.42rem;
+  background: rgba(15, 23, 42, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.hud__item span {
+  display: block;
+  color: #a8c7d8;
+  font-size: 0.68rem;
+}
+
+.hud__item strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+}
+
+.canvas-wrap {
+  position: relative;
+  width: min(360px, calc(100vw - 1rem));
+  aspect-ratio: 9 / 16;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+#gameCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  user-select: none;
+}
+
+.touch-hint {
+  width: min(360px, calc(100vw - 1rem));
+  color: #a8c7d8;
+  text-align: center;
+  font-size: 0.82rem;
+  margin: 0.2rem 0;
+}
+
+.game-actions,
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.dialogue-box {
+  min-height: 8rem;
+  border-radius: 22px;
+  padding: 1.2rem;
+  background: rgba(255, 255, 255, 0.06);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  line-height: 1.8;
+  margin-top: 1rem;
+}
+
+.result-stats {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1rem 0;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: 14px;
+  padding: 0.7rem 0.85rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.achievement-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.achievement {
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 0.58;
+}
+
+.achievement.is-unlocked {
+  opacity: 1;
+  background: rgba(250, 204, 21, 0.12);
+}
+
+.achievement strong,
+.achievement span {
+  display: block;
+}
+
+.achievement span {
+  color: #b7d4e5;
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 1rem 0;
+}
+
+.switch {
+  display: inline-grid;
+  place-items: center;
+  width: 3.6rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+  position: relative;
+}
+
+.switch input {
+  opacity: 0;
+  position: absolute;
+}
+
+.switch span {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: white;
+  transform: translateX(-0.7rem);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.switch input:checked + span {
+  transform: translateX(0.7rem);
+  background: #7dd3fc;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 520px) {
+  .app-shell {
+    padding: 0.5rem;
+  }
+
+  .app-header {
+    font-size: 0.82rem;
+  }
+
+  .panel {
+    border-radius: 22px;
+  }
+
+  button {
+    width: 100%;
+  }
+
+  .game-actions button,
+  .panel-actions button {
+    width: auto;
+    flex: 1 1 9rem;
+  }
+}
