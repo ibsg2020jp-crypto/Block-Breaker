@@ -33,7 +33,7 @@
         <section id="stageScreen" class="screen">
           <div class="panel">
             <h2>ステージ選択</h2>
-            <p>クリアすると次のステージが開放されます。</p>
+            <p>クリアすると次のステージが開放されます。記録は現在の難易度・速度設定ごとに保存され、総合最高スコアも残ります。</p>
             <div id="stageList" class="stage-list"></div>
             <div class="panel-actions">
               <button data-screen="titleScreen" class="secondary-button">タイトルへ戻る</button>
@@ -97,6 +97,7 @@
         <section id="settingsScreen" class="screen">
           <div class="panel">
             <h2>設定</h2>
+
             <div class="setting-row">
               <div>
                 <strong>サウンド</strong>
@@ -107,6 +108,24 @@
                 <span></span>
               </label>
             </div>
+
+            <label class="setting-block" for="difficultySelect">
+              <span class="setting-block__title">難易度</span>
+              <select id="difficultySelect">
+                <option value="easy">イージー</option>
+                <option value="normal">ノーマル</option>
+                <option value="hard">ハード</option>
+                <option value="nightmare">ナイトメア</option>
+              </select>
+              <small id="difficultyDescription">制限時間 1x / パドル 1x / スコア 1x</small>
+            </label>
+
+            <label class="setting-block" for="ballSpeedRange">
+              <span class="setting-block__title">ボールの速さ <strong id="ballSpeedValue">1.0x</strong></span>
+              <input id="ballSpeedRange" type="range" min="0.5" max="3" step="0.1" value="1" />
+              <small>0.5x〜3.0xまで調整できます。プレイ開始時に反映されます。</small>
+            </label>
+
             <div class="panel-actions">
               <button id="resetSaveButton" class="secondary-button">セーブデータをリセット</button>
               <button data-screen="titleScreen">タイトルへ戻る</button>
