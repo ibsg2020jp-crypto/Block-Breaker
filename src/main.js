@@ -16,7 +16,7 @@ import {
 } from "./storage.js";
 import { SoundSystem } from "./audio.js";
 
-const RANKING_API_URL = "https://script.google.com/macros/s/AKfycbzT4qClBfy4bDu1F3ve9i60XE7vCcEjEaXH6myDFL3aTAWmhcKNA-zj3Qa7DY6_e6lM/exec";
+const RANKING_API_URL = "https://script.google.com/macros/s/AKfycbzA-MUlGfpVkLS4T_LCpYeJ1nGJxVe7jK8XDTbKWMAhOaNWMahXa1TynuVSyM1aNxz4/exec";
 const $ = (id) => document.getElementById(id);
 
 const screens = [...document.querySelectorAll(".screen")];
