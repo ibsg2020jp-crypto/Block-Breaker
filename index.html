@@ -24,6 +24,7 @@
             <div class="menu-grid">
               <button id="startButton" class="primary-button">はじめる</button>
               <button id="stageButton">ステージ選択</button>
+              <button id="rankingButton">ランキング</button>
               <button id="achievementButton">実績</button>
               <button id="settingsButton">設定</button>
             </div>
@@ -76,11 +77,44 @@
             <p id="resultSubtitle"></p>
             <div id="resultStats" class="result-stats"></div>
             <p id="resultAchievements"></p>
+
+            <div id="scoreSubmitBox" class="score-submit" hidden>
+              <h3>オンラインランキングに登録</h3>
+              <p id="scoreSubmitSummary"></p>
+              <label class="setting-block" for="playerNameInput">
+                <span class="setting-block__title">名前</span>
+                <input id="playerNameInput" type="text" inputmode="latin" maxlength="10" placeholder="英数字10文字" autocomplete="off" />
+                <small>英数字のみ、10文字まで。例: AGU2026</small>
+              </label>
+              <div class="panel-actions">
+                <button id="submitScoreButton" class="primary-button">スコアを送信</button>
+                <button data-screen="rankingScreen" class="secondary-button">ランキングを見る</button>
+              </div>
+              <p id="scoreSubmitStatus" class="status-text"></p>
+            </div>
+
             <div class="panel-actions">
               <button id="nextStageButton" class="primary-button">次のステージへ</button>
               <button id="retryButton">もう一度遊ぶ</button>
               <button id="resultStageButton" class="secondary-button">ステージ選択へ</button>
             </div>
+          </div>
+        </section>
+
+        <section id="rankingScreen" class="screen">
+          <div class="panel">
+            <h2>ランキング</h2>
+            <p>Googleスプレッドシートに保存されたオンラインランキングです。</p>
+            <label class="setting-block" for="rankingStageSelect">
+              <span class="setting-block__title">表示するステージ</span>
+              <select id="rankingStageSelect"></select>
+            </label>
+            <div class="panel-actions">
+              <button id="refreshRankingButton" class="primary-button">更新</button>
+              <button data-screen="titleScreen" class="secondary-button">タイトルへ戻る</button>
+            </div>
+            <p id="rankingStatus" class="status-text"></p>
+            <ol id="rankingList" class="ranking-list"></ol>
           </div>
         </section>
 
