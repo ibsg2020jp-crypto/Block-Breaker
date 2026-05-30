@@ -6,9 +6,16 @@ export function sanitizePlayerName(value) {
     .slice(0, 10);
 }
 
+export function sanitizePlayerId(value) {
+  return String(value || "")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 40);
+}
+
 export function submitScore(apiUrl, scoreData) {
   return jsonpRequest(apiUrl, {
     action: "submit",
+    playerId: sanitizePlayerId(scoreData.playerId),
     name: sanitizePlayerName(scoreData.name),
     score: Math.floor(Number(scoreData.score) || 0),
     stageId: Math.floor(Number(scoreData.stageId) || 0),
@@ -16,6 +23,14 @@ export function submitScore(apiUrl, scoreData) {
     difficulty: String(scoreData.difficulty || "").slice(0, 20),
     ballSpeed: String(scoreData.ballSpeed || "").slice(0, 10),
     clearTime: String(scoreData.clearTime || "").slice(0, 20)
+  });
+}
+
+export function updatePlayerName(apiUrl, playerData) {
+  return jsonpRequest(apiUrl, {
+    action: "updatePlayer",
+    playerId: sanitizePlayerId(playerData.playerId),
+    name: sanitizePlayerName(playerData.name)
   });
 }
 
