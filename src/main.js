@@ -3,10 +3,15 @@ import { Game } from "./game.js";
 import { formatDecimal, formatTime } from "./physics.js";
 import {
   ACHIEVEMENTS,
+  DIFFICULTIES,
+  getDifficultyConfig,
   loadSave,
+  makeRecordKey,
+  normalizeSpeedMultiplier,
   recordStageClear,
   recordStageFail,
   resetSave,
+  updateSettings,
   updateSoundSetting
 } from "./storage.js";
 import { SoundSystem } from "./audio.js";
@@ -96,8 +101,28 @@ function bindButtons() {
     audio.play("click");
   });
 
+  $("difficultySelect").addEventListener("change", (event) => {
+    save = updateSettings(save, { difficulty: event.target.value });
+    audio.play("click");
+    renderSettings();
+    renderStageList();
+  });
+
+  $("ballSpeedRange").addEventListener("input", (event) => {
+    const speed = normalizeSpeedMultiplier(event.target.value);
+    $("ballSpeedValue").textContent = `${speed.toFixed(1)}x`;
+  });
+
+  $("ballSpeedRange").addEventListener("change", (event) => {
+    const speed = normalizeSpeedMultiplier(event.target.value);
+    save = updateSettings(save, { ballSpeedMultiplier: speed });
+    audio.play("click");
+    renderSettings();
+    renderStageList();
+  });
+
   $("resetSaveButton").addEventListener("click", () => {
-    const ok = confirm("進行状況・ベストタイム・実績をリセットしますか？");
+    const ok = confirm("進行状況・ベストタイム・実績・設定をリセットしますか？");
     if (!ok) return;
     save = resetSave();
     audio.setEnabled(save.settings.sound);
@@ -161,8 +186,19 @@ function showDialogue(stage, lines, onDone) {
 function loadGame(stage) {
   $("pauseButton").textContent = "一時停止";
   showScreen("gameScreen");
-  game.loadStage(stage);
+  game.loadStage(stage, buildPlaySettings());
   game.start();
+}
+
+function buildPlaySettings() {
+  const difficulty = getDifficultyConfig(save.settings);
+  return {
+    difficulty: difficulty.id,
+    timeMultiplier: difficulty.timeMultiplier,
+    paddleMultiplier: difficulty.paddleMultiplier,
+    scoreMultiplier: difficulty.scoreMultiplier,
+    ballSpeedMultiplier: normalizeSpeedMultiplier(save.settings.ballSpeedMultiplier)
+  };
 }
 
 function handleStageClear(result) {
@@ -183,11 +219,14 @@ function handleStageFail(result) {
 function showResult(cleared, result, newlyUnlocked) {
   game.stop();
   const stage = STAGES[currentStageIndex];
+  const difficulty = getDifficultyConfig(result.settings?.difficulty);
   $("resultTitle").textContent = cleared ? "ステージクリア！" : "失敗…";
   $("resultSubtitle").textContent = cleared ? stage.dialogueAfter?.[0] ?? "次のステージへ進めます。" : result.reason;
 
   const rows = [
     ["ステージ", `${stage.id}：${stage.name}`],
+    ["難易度", difficulty.label],
+    ["ボール速度", `${normalizeSpeedMultiplier(result.settings?.ballSpeedMultiplier).toFixed(1)}x`],
     ["スコア", result.score.toLocaleString()],
     ["タイム", formatDecimal(result.clearTime)],
     ["残機", `${Math.max(0, result.lives)} / ${stage.lives}`],
@@ -242,8 +281,16 @@ function renderStageList() {
 
 function getStageSummary(record) {
   if (!record.cleared) return "未クリア";
-  const time = record.bestTime == null ? "-" : formatDecimal(record.bestTime);
-  return `評価 ${record.bestRank} / Best ${time}`;
+  const currentKey = makeRecordKey(save.settings);
+  const currentRecord = record.records?.[currentKey];
+  const overallScore = record.bestScore == null ? "-" : record.bestScore.toLocaleString();
+  const overallTime = record.bestTime == null ? "-" : formatDecimal(record.bestTime);
+
+  if (currentRecord) {
+    return `現在設定: ${currentRecord.bestScore.toLocaleString()}点 / ${formatDecimal(currentRecord.bestTime)}｜総合: ${overallScore}点 / ${overallTime}`;
+  }
+
+  return `現在設定: 未記録｜総合: ${overallScore}点 / ${overallTime}`;
 }
 
 function renderAchievements() {
@@ -263,5 +310,12 @@ function renderAchievements() {
 }
 
 function renderSettings() {
+  const difficulty = getDifficultyConfig(save.settings);
+  const speed = normalizeSpeedMultiplier(save.settings.ballSpeedMultiplier);
+
   $("soundToggle").checked = Boolean(save.settings.sound);
+  $("difficultySelect").value = difficulty.id;
+  $("difficultyDescription").textContent = `制限時間 ${difficulty.timeMultiplier}x / パドル ${difficulty.paddleMultiplier}x / スコア ${difficulty.scoreMultiplier}x`;
+  $("ballSpeedRange").value = speed.toFixed(1);
+  $("ballSpeedValue").textContent = `${speed.toFixed(1)}x`;
 }
