@@ -24,7 +24,17 @@ export class Game {
     this.result = null;
 
     this.paddle = { x: 130, y: 568, w: 100, h: 14, speed: 360 };
-    this.ball = { x: 180, y: 548, r: 7, vx: 0, vy: 0, speed: 270, stuck: true, warpCooldown: 0 };
+    this.ball = {
+      x: 180,
+      y: 548,
+      r: 7,
+      vx: 0,
+      vy: 0,
+      speed: 270,
+      stuck: true,
+      warpCooldown: 0,
+      warpLocked: false
+    };
 
     this.bindInput();
     this.resizeCanvas();
@@ -177,6 +187,8 @@ export class Game {
     this.ball.y = this.paddle.y - this.ball.r - 0.5;
     reflectFromPaddle(this.ball, this.paddle);
     this.limitBallSpeed();
+    this.ball.warpLocked = false;
+    this.ball.warpCooldown = 0;
     this.hooks.onSound?.("paddle");
   }
 
@@ -254,7 +266,7 @@ export class Game {
   }
 
   checkWarpCollision() {
-    if (!this.stage.warps?.length || this.ball.warpCooldown > 0) return;
+    if (!this.stage.warps?.length || this.ball.warpCooldown > 0 || this.ball.warpLocked) return;
 
     for (const warp of this.stage.warps) {
       const dx = this.ball.x - warp.in.x;
@@ -263,6 +275,7 @@ export class Game {
         this.ball.x = warp.out.x;
         this.ball.y = warp.out.y;
         this.ball.warpCooldown = 0.7;
+        this.ball.warpLocked = true;
         this.warpUses += 1;
         this.hooks.onSound?.("warp");
         break;
@@ -336,6 +349,7 @@ export class Game {
     this.ball.x = this.paddle.x + this.paddle.w / 2;
     this.ball.y = this.paddle.y - this.ball.r - 2;
     this.ball.warpCooldown = 0;
+    this.ball.warpLocked = false;
   }
 
   limitBallSpeed() {
@@ -425,8 +439,9 @@ export class Game {
 
   drawWarps(ctx) {
     for (const warp of this.stage?.warps ?? []) {
-      drawWarp(ctx, warp.in.x, warp.in.y, warp.label, "入口");
-      drawWarp(ctx, warp.out.x, warp.out.y, warp.label, "出口");
+      const disabled = this.ball.warpLocked;
+      drawWarp(ctx, warp.in.x, warp.in.y, warp.label, "入口", disabled);
+      drawWarp(ctx, warp.out.x, warp.out.y, warp.label, "出口", disabled);
     }
   }
 
@@ -546,8 +561,9 @@ function drawBackground(ctx) {
   }
 }
 
-function drawWarp(ctx, x, y, label, caption) {
+function drawWarp(ctx, x, y, label, caption, disabled = false) {
   ctx.save();
+  ctx.globalAlpha = disabled ? 0.35 : 1;
   ctx.strokeStyle = caption === "入口" ? "#f0abfc" : "#7dd3fc";
   ctx.lineWidth = 3;
   ctx.beginPath();
