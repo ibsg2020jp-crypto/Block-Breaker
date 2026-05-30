@@ -7,6 +7,8 @@ const BLOCK_MARGIN = 18;
 const BLOCK_TOP = 96;
 const BLOCK_GAP = 6;
 const BLOCK_HEIGHT = 22;
+const BASE_PADDLE_WIDTH = 100;
+const BASE_BALL_SPEED = 270;
 
 export class Game {
   constructor(canvas, hooks = {}) {
@@ -22,15 +24,16 @@ export class Game {
     this.running = false;
     this.pointerActive = false;
     this.result = null;
+    this.playSettings = createPlaySettings();
 
-    this.paddle = { x: 130, y: 568, w: 100, h: 14, speed: 360 };
+    this.paddle = { x: 130, y: 568, w: BASE_PADDLE_WIDTH, h: 14, speed: 360 };
     this.ball = {
       x: 180,
       y: 548,
       r: 7,
       vx: 0,
       vy: 0,
-      speed: 270,
+      speed: BASE_BALL_SPEED,
       stuck: true,
       warpCooldown: 0,
       warpLocked: false
@@ -43,12 +46,15 @@ export class Game {
     window.addEventListener("keyup", (event) => this.keys.delete(event.key));
   }
 
-  loadStage(stage) {
+  loadStage(stage, settings = {}) {
     this.stage = stage;
+    this.playSettings = createPlaySettings(settings);
     this.blocks = createBlocks(stage.layout);
     this.state = "ready";
     this.elapsed = 0;
-    this.remainingTime = stage.timeLimit;
+    this.stageTimeLimit = Math.max(15, Math.round(stage.timeLimit * this.playSettings.timeMultiplier));
+    this.stageTargetTime = Math.max(10, stage.targetTime * this.playSettings.timeMultiplier);
+    this.remainingTime = this.stageTimeLimit;
     this.score = 0;
     this.lives = stage.lives;
     this.startLives = stage.lives;
@@ -56,8 +62,10 @@ export class Game {
     this.warpUses = 0;
     this.switchUsed = false;
     this.result = null;
+    this.paddle.w = clamp(BASE_PADDLE_WIDTH * this.playSettings.paddleMultiplier, 24, 150);
     this.paddle.x = (WORLD_WIDTH - this.paddle.w) / 2;
     this.paddle.y = 568;
+    this.ball.speed = BASE_BALL_SPEED * this.playSettings.ballSpeedMultiplier;
     this.resetBall();
     this.notifyStats();
     this.render();
@@ -87,8 +95,9 @@ export class Game {
     if (this.state !== "ready") return;
     this.state = "playing";
     this.ball.stuck = false;
-    this.ball.vx = 95;
+    this.ball.vx = 95 * this.playSettings.ballSpeedMultiplier;
     this.ball.vy = -this.ball.speed;
+    this.limitBallSpeed();
     this.hooks.onSound?.("launch");
   }
 
@@ -116,7 +125,7 @@ export class Game {
     }
 
     this.elapsed += dt;
-    this.remainingTime = Math.max(0, this.stage.timeLimit - this.elapsed);
+    this.remainingTime = Math.max(0, this.stageTimeLimit - this.elapsed);
     this.ball.warpCooldown = Math.max(0, this.ball.warpCooldown - dt);
 
     if (this.remainingTime <= 0) {
@@ -202,12 +211,12 @@ export class Game {
         block.hp -= 1;
         if (block.hp <= 0) {
           block.active = false;
-          this.score += block.score;
+          this.addScore(block.score);
           this.blocksBroken += 1;
           this.hooks.onSound?.(block.type === "switch" ? "switch" : "block");
           if (block.type === "switch") this.activateSwitch();
         } else {
-          this.score += 50;
+          this.addScore(50);
           this.hooks.onSound?.("block");
         }
       } else {
@@ -300,19 +309,8 @@ export class Game {
     const clearTime = this.elapsed;
     const timeBonus = Math.ceil(this.remainingTime) * 10;
     const lifeBonus = this.lives * 300;
-    this.score += 1000 + timeBonus + lifeBonus;
-    this.result = {
-      cleared: true,
-      stageId: this.stage.id,
-      score: this.score,
-      clearTime,
-      remainingTime: this.remainingTime,
-      lives: this.lives,
-      livesLost: this.startLives - this.lives,
-      blocksBroken: this.blocksBroken,
-      warpUses: this.warpUses,
-      rank: this.calculateRank(clearTime)
-    };
+    this.addScore(1000 + timeBonus + lifeBonus);
+    this.result = this.createResult(true, null, this.calculateRank(clearTime));
     this.hooks.onSound?.("clear");
     this.hooks.onStageClear?.(this.result);
   }
@@ -320,26 +318,47 @@ export class Game {
   fail(reason) {
     if (this.state === "fail") return;
     this.state = "fail";
-    this.result = {
-      cleared: false,
-      reason,
-      score: this.score,
-      clearTime: this.elapsed,
-      lives: this.lives,
-      livesLost: this.startLives - this.lives,
-      blocksBroken: this.blocksBroken,
-      warpUses: this.warpUses,
-      rank: "-"
-    };
+    this.result = this.createResult(false, reason, "-");
     this.hooks.onSound?.("fail");
     this.hooks.onStageFail?.(this.result);
   }
 
+  createResult(cleared, reason, rank) {
+    return {
+      cleared,
+      reason,
+      stageId: this.stage.id,
+      score: this.score,
+      clearTime: this.elapsed,
+      targetTime: this.stageTargetTime,
+      remainingTime: this.remainingTime,
+      lives: this.lives,
+      startLives: this.startLives,
+      livesLost: this.startLives - this.lives,
+      blocksBroken: this.blocksBroken,
+      warpUses: this.warpUses,
+      rank,
+      settings: {
+        difficulty: this.playSettings.difficulty,
+        ballSpeedMultiplier: this.playSettings.ballSpeedMultiplier
+      },
+      modifiers: {
+        timeMultiplier: this.playSettings.timeMultiplier,
+        paddleMultiplier: this.playSettings.paddleMultiplier,
+        scoreMultiplier: this.playSettings.scoreMultiplier
+      }
+    };
+  }
+
   calculateRank(clearTime) {
-    if (clearTime <= this.stage.targetTime && this.lives === this.startLives && this.score >= 2500) return "S";
-    if (clearTime <= this.stage.targetTime) return "A";
+    if (clearTime <= this.stageTargetTime && this.lives === this.startLives && this.score >= 2500) return "S";
+    if (clearTime <= this.stageTargetTime) return "A";
     if (this.lives >= 2) return "B";
     return "C";
+  }
+
+  addScore(baseScore) {
+    this.score += Math.max(0, Math.round(baseScore * this.playSettings.scoreMultiplier));
   }
 
   resetBall() {
@@ -353,7 +372,10 @@ export class Game {
   }
 
   limitBallSpeed() {
-    const speed = Math.min(380, Math.max(230, Math.hypot(this.ball.vx, this.ball.vy)));
+    const base = BASE_BALL_SPEED * this.playSettings.ballSpeedMultiplier;
+    const minSpeed = Math.max(120, base * 0.85);
+    const maxSpeed = Math.min(900, base * 1.35);
+    const speed = Math.min(maxSpeed, Math.max(minSpeed, Math.hypot(this.ball.vx, this.ball.vy)));
     const angle = Math.atan2(this.ball.vy, this.ball.vx);
     this.ball.vx = Math.cos(angle) * speed;
     this.ball.vy = Math.sin(angle) * speed;
@@ -370,7 +392,9 @@ export class Game {
       lives: this.lives ?? 0,
       remainingTime: this.remainingTime ?? 0,
       state: this.state,
-      breakableBlocks: this.countBreakableBlocks()
+      breakableBlocks: this.countBreakableBlocks(),
+      difficulty: this.playSettings.difficulty,
+      ballSpeedMultiplier: this.playSettings.ballSpeedMultiplier
     });
   }
 
@@ -515,6 +539,22 @@ export class Game {
     this.canvas.width = WORLD_WIDTH;
     this.canvas.height = WORLD_HEIGHT;
   }
+}
+
+function createPlaySettings(settings = {}) {
+  const difficulty = settings.difficulty ?? "normal";
+  const timeMultiplier = Number.isFinite(settings.timeMultiplier) ? settings.timeMultiplier : 1;
+  const paddleMultiplier = Number.isFinite(settings.paddleMultiplier) ? settings.paddleMultiplier : 1;
+  const scoreMultiplier = Number.isFinite(settings.scoreMultiplier) ? settings.scoreMultiplier : 1;
+  const ballSpeedMultiplier = Number.isFinite(settings.ballSpeedMultiplier) ? clamp(settings.ballSpeedMultiplier, 0.5, 3) : 1;
+
+  return {
+    difficulty,
+    timeMultiplier,
+    paddleMultiplier,
+    scoreMultiplier,
+    ballSpeedMultiplier: Math.round(ballSpeedMultiplier * 10) / 10
+  };
 }
 
 function createBlocks(layout) {
