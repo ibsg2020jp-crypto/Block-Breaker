@@ -41,7 +41,12 @@ export const ACHIEVEMENTS = [
 ];
 
 export function createDefaultSave() {
+  const playerId = createPlayerId();
   return {
+    player: {
+      id: playerId,
+      name: createDefaultPlayerName(playerId)
+    },
     unlockedStage: 1,
     stages: {},
     stats: {
@@ -164,6 +169,17 @@ export function updateSettings(save, partialSettings) {
   return next;
 }
 
+export function updatePlayerProfile(save, partialPlayer) {
+  const next = normalizeSave(save);
+  next.player = normalizePlayer({
+    ...next.player,
+    ...partialPlayer,
+    id: next.player.id
+  });
+  saveData(next);
+  return next;
+}
+
 function unlockAchievements(save, stage, result, totalStages) {
   const newlyUnlocked = [];
   const clearedStageCount = Object.values(save.stages).filter((item) => item.cleared).length;
@@ -197,14 +213,50 @@ function betterRank(a, b) {
 
 function normalizeSave(input) {
   const base = createDefaultSave();
-  return {
+  const normalized = {
     ...base,
     ...input,
+    player: normalizePlayer(input?.player ?? base.player),
     stages: normalizeStages(input?.stages ?? {}),
     stats: { ...base.stats, ...(input?.stats ?? {}) },
     achievements: { ...base.achievements, ...(input?.achievements ?? {}) },
     settings: normalizeSettings({ ...base.settings, ...(input?.settings ?? {}) })
   };
+
+  if (!input?.player?.name && input?.settings?.playerName) {
+    normalized.player.name = normalizePlayerName(input.settings.playerName) || normalized.player.name;
+  }
+
+  return normalized;
+}
+
+function normalizePlayer(player) {
+  const id = normalizePlayerId(player?.id) || createPlayerId();
+  const name = normalizePlayerName(player?.name) || createDefaultPlayerName(id);
+  return { id, name };
+}
+
+function normalizePlayerId(value) {
+  return String(value || "")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 40);
+}
+
+function normalizePlayerName(value) {
+  return String(value || "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 10);
+}
+
+function createPlayerId() {
+  if (globalThis.crypto?.randomUUID) {
+    return `p_${globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
+  }
+  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function createDefaultPlayerName(playerId) {
+  return `P${playerId.replace(/[^a-zA-Z0-9]/g, "").slice(-9).toUpperCase()}`.slice(0, 10);
 }
 
 function normalizeSettings(settings) {
