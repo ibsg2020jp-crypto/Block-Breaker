@@ -1,9 +1,9 @@
 import { STAGES } from "./stages.js";
 import { Game } from "./game.js";
 import { formatDecimal, formatTime } from "./physics.js";
+import { fetchRanking, sanitizePlayerName, submitScore } from "./ranking.js";
 import {
   ACHIEVEMENTS,
-  DIFFICULTIES,
   getDifficultyConfig,
   loadSave,
   makeRecordKey,
@@ -16,12 +16,14 @@ import {
 } from "./storage.js";
 import { SoundSystem } from "./audio.js";
 
+const RANKING_API_URL = "https://script.google.com/macros/s/AKfycbzT4qClBfy4bDu1F3ve9i60XE7vCcEjEaXH6myDFL3aTAWmhcKNA-zj3Qa7DY6_e6lM/exec";
 const $ = (id) => document.getElementById(id);
 
 const screens = [...document.querySelectorAll(".screen")];
 const canvas = $("gameCanvas");
 let save = loadSave();
 let currentStageIndex = 0;
+let latestClearResult = null;
 const audio = new SoundSystem(save.settings.sound);
 
 const game = new Game(canvas, {
@@ -38,6 +40,7 @@ function init() {
   renderStageList();
   renderAchievements();
   renderSettings();
+  renderRankingStageSelect();
   showScreen("titleScreen");
 }
 
@@ -51,6 +54,13 @@ function bindButtons() {
     audio.play("click");
     renderStageList();
     showScreen("stageScreen");
+  });
+
+  $("rankingButton").addEventListener("click", () => {
+    audio.play("click");
+    renderRankingStageSelect();
+    showScreen("rankingScreen");
+    loadRanking();
   });
 
   $("achievementButton").addEventListener("click", () => {
@@ -69,6 +79,10 @@ function bindButtons() {
     button.addEventListener("click", () => {
       audio.play("click");
       if (button.dataset.screen === "stageScreen") renderStageList();
+      if (button.dataset.screen === "rankingScreen") {
+        renderRankingStageSelect();
+        loadRanking();
+      }
       showScreen(button.dataset.screen);
     });
   });
@@ -93,6 +107,23 @@ function bindButtons() {
     audio.play("click");
     renderStageList();
     showScreen("stageScreen");
+  });
+
+  $("submitScoreButton").addEventListener("click", async () => {
+    await submitLatestScore();
+  });
+
+  $("playerNameInput").addEventListener("input", (event) => {
+    event.target.value = sanitizePlayerName(event.target.value);
+  });
+
+  $("rankingStageSelect").addEventListener("change", () => {
+    loadRanking();
+  });
+
+  $("refreshRankingButton").addEventListener("click", () => {
+    audio.play("click");
+    loadRanking();
   });
 
   $("soundToggle").addEventListener("change", (event) => {
@@ -148,6 +179,7 @@ function startStage(index, skipDialogue = false) {
   const stage = STAGES[safeIndex];
   if (stage.id > save.unlockedStage) return;
   currentStageIndex = safeIndex;
+  latestClearResult = null;
 
   if (!skipDialogue && stage.dialogueBefore?.length) {
     showDialogue(stage, stage.dialogueBefore, () => loadGame(stage));
@@ -203,6 +235,7 @@ function buildPlaySettings() {
 
 function handleStageClear(result) {
   const stage = STAGES[currentStageIndex];
+  latestClearResult = result;
   const newlyUnlocked = recordStageClear(save, stage, result, STAGES.length);
   save = loadSave();
   renderStageList();
@@ -211,6 +244,7 @@ function handleStageClear(result) {
 }
 
 function handleStageFail(result) {
+  latestClearResult = null;
   save = recordStageFail(save, result);
   renderAchievements();
   showResult(false, result, []);
@@ -229,6 +263,7 @@ function showResult(cleared, result, newlyUnlocked) {
     ["ボール速度", `${normalizeSpeedMultiplier(result.settings?.ballSpeedMultiplier).toFixed(1)}x`],
     ["スコア", result.score.toLocaleString()],
     ["タイム", formatDecimal(result.clearTime)],
+    ["残り時間ボーナス", `${(result.timeBonus ?? 0).toLocaleString()}点`],
     ["残機", `${Math.max(0, result.lives)} / ${stage.lives}`],
     ["評価", result.rank]
   ];
@@ -245,8 +280,56 @@ function showResult(cleared, result, newlyUnlocked) {
     ? `実績解除：${achievementNames.join("、")}`
     : "新しい実績解除はありません。";
 
+  renderScoreSubmit(cleared, result, stage, difficulty);
   $("nextStageButton").hidden = !cleared || currentStageIndex >= STAGES.length - 1;
   showScreen("resultScreen");
+}
+
+function renderScoreSubmit(cleared, result, stage, difficulty) {
+  const box = $("scoreSubmitBox");
+  if (!cleared) {
+    box.hidden = true;
+    return;
+  }
+
+  box.hidden = false;
+  $("scoreSubmitSummary").textContent = `${stage.name} / ${difficulty.label} / ${normalizeSpeedMultiplier(result.settings?.ballSpeedMultiplier).toFixed(1)}x / ${result.score.toLocaleString()}点`;
+  $("scoreSubmitStatus").textContent = "";
+  $("submitScoreButton").disabled = false;
+}
+
+async function submitLatestScore() {
+  if (!latestClearResult) return;
+  const name = sanitizePlayerName($("playerNameInput").value);
+  if (!name) {
+    $("scoreSubmitStatus").textContent = "名前は英数字1〜10文字で入力してください。";
+    return;
+  }
+
+  const stage = STAGES[currentStageIndex];
+  const difficulty = getDifficultyConfig(latestClearResult.settings?.difficulty);
+  $("submitScoreButton").disabled = true;
+  $("scoreSubmitStatus").textContent = "送信中...";
+
+  try {
+    await submitScore(RANKING_API_URL, {
+      name,
+      score: latestClearResult.score,
+      stageId: stage.id,
+      stageName: stage.name,
+      difficulty: difficulty.label,
+      ballSpeed: `${normalizeSpeedMultiplier(latestClearResult.settings?.ballSpeedMultiplier).toFixed(1)}x`,
+      clearTime: formatDecimal(latestClearResult.clearTime)
+    });
+    $("scoreSubmitStatus").textContent = "ランキングに送信しました。";
+    $("submitScoreButton").disabled = false;
+    renderRankingStageSelect(stage.id);
+    await loadRanking(stage.id);
+  } catch (error) {
+    console.error(error);
+    $("scoreSubmitStatus").textContent = "送信に失敗しました。時間をおいて再試行してください。";
+    $("submitScoreButton").disabled = false;
+  }
 }
 
 function updateHud(stats) {
@@ -318,4 +401,54 @@ function renderSettings() {
   $("difficultyDescription").textContent = `制限時間 ${difficulty.timeMultiplier}x / パドル ${difficulty.paddleMultiplier}x / スコア ${difficulty.scoreMultiplier}x`;
   $("ballSpeedRange").value = speed.toFixed(1);
   $("ballSpeedValue").textContent = `${speed.toFixed(1)}x`;
+}
+
+function renderRankingStageSelect(selectedStageId = Number($("rankingStageSelect")?.value) || 0) {
+  const select = $("rankingStageSelect");
+  select.innerHTML = `<option value="0">全ステージ</option>`;
+  STAGES.forEach((stage) => {
+    const option = document.createElement("option");
+    option.value = String(stage.id);
+    option.textContent = `Stage ${stage.id}: ${stage.name}`;
+    select.appendChild(option);
+  });
+  select.value = String(selectedStageId || 0);
+}
+
+async function loadRanking(stageId = Number($("rankingStageSelect").value) || 0) {
+  $("rankingStatus").textContent = "読み込み中...";
+  $("rankingList").innerHTML = "";
+
+  try {
+    const data = await fetchRanking(RANKING_API_URL, { stageId, limit: 10 });
+    const ranking = data.ranking ?? [];
+    if (!ranking.length) {
+      $("rankingStatus").textContent = "まだ記録がありません。";
+      return;
+    }
+
+    $("rankingStatus").textContent = "";
+    $("rankingList").innerHTML = ranking
+      .map((row) => `
+        <li class="ranking-row">
+          <span class="ranking-rank">${row.rank}</span>
+          <strong>${escapeHtml(row.name)}</strong>
+          <span>${Number(row.score).toLocaleString()}点</span>
+          <small>${escapeHtml(row.stageName)} / ${escapeHtml(row.difficulty)} / ${escapeHtml(row.ballSpeed)} / ${escapeHtml(row.clearTime)}</small>
+        </li>
+      `)
+      .join("");
+  } catch (error) {
+    console.error(error);
+    $("rankingStatus").textContent = "ランキングを読み込めませんでした。Apps Scriptの公開設定を確認してください。";
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
