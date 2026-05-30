@@ -50,17 +50,23 @@ button:disabled {
 }
 
 select,
-input[type="range"] {
+input[type="range"],
+input[type="text"] {
   width: 100%;
 }
 
-select {
+select,
+input[type="text"] {
   border: 0;
   border-radius: 14px;
   padding: 0.85rem 0.9rem;
   background: rgba(15, 23, 42, 0.86);
   color: #f8fafc;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+input[type="text"]::placeholder {
+  color: #7f98aa;
 }
 
 input[type="range"] {
@@ -281,6 +287,59 @@ input[type="range"] {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.score-submit {
+  margin: 1.2rem 0;
+  padding: 1rem;
+  border-radius: 22px;
+  background: rgba(56, 189, 248, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.18);
+}
+
+.score-submit h3 {
+  margin: 0 0 0.4rem;
+}
+
+.status-text {
+  min-height: 1.5rem;
+  color: #b7d4e5;
+  font-size: 0.92rem;
+}
+
+.ranking-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.ranking-row {
+  display: grid;
+  grid-template-columns: 2.3rem 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+  border-radius: 16px;
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ranking-row small {
+  grid-column: 2 / -1;
+  color: #b7d4e5;
+  line-height: 1.5;
+}
+
+.ranking-rank {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: rgba(125, 211, 252, 0.18);
+  color: #e0f2fe;
+  font-weight: 800;
+}
+
 .achievement-list {
   list-style: none;
   padding: 0;
@@ -405,5 +464,13 @@ input[type="range"] {
   .panel-actions button {
     width: auto;
     flex: 1 1 9rem;
+  }
+
+  .ranking-row {
+    grid-template-columns: 2.3rem 1fr;
+  }
+
+  .ranking-row > span:last-of-type {
+    grid-column: 2 / -1;
   }
 }
