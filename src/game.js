@@ -25,6 +25,7 @@ export class Game {
     this.pointerActive = false;
     this.result = null;
     this.playSettings = createPlaySettings();
+    this.timeBonus = 0;
 
     this.paddle = { x: 130, y: 568, w: BASE_PADDLE_WIDTH, h: 14, speed: 360 };
     this.ball = {
@@ -56,6 +57,7 @@ export class Game {
     this.stageTargetTime = Math.max(10, stage.targetTime * this.playSettings.timeMultiplier);
     this.remainingTime = this.stageTimeLimit;
     this.score = 0;
+    this.timeBonus = 0;
     this.lives = stage.lives;
     this.startLives = stage.lives;
     this.blocksBroken = 0;
@@ -307,9 +309,10 @@ export class Game {
     if (this.state === "clear") return;
     this.state = "clear";
     const clearTime = this.elapsed;
-    const timeBonus = Math.ceil(this.remainingTime) * 10;
     const lifeBonus = this.lives * 300;
-    this.addScore(1000 + timeBonus + lifeBonus);
+    this.timeBonus = this.calculateTimeBonus();
+    this.addScore(1000 + lifeBonus);
+    this.score += this.timeBonus;
     this.result = this.createResult(true, null, this.calculateRank(clearTime));
     this.hooks.onSound?.("clear");
     this.hooks.onStageClear?.(this.result);
@@ -318,6 +321,7 @@ export class Game {
   fail(reason) {
     if (this.state === "fail") return;
     this.state = "fail";
+    this.timeBonus = 0;
     this.result = this.createResult(false, reason, "-");
     this.hooks.onSound?.("fail");
     this.hooks.onStageFail?.(this.result);
@@ -329,6 +333,7 @@ export class Game {
       reason,
       stageId: this.stage.id,
       score: this.score,
+      timeBonus: this.timeBonus,
       clearTime: this.elapsed,
       targetTime: this.stageTargetTime,
       remainingTime: this.remainingTime,
@@ -355,6 +360,11 @@ export class Game {
     if (clearTime <= this.stageTargetTime) return "A";
     if (this.lives >= 2) return "B";
     return "C";
+  }
+
+  calculateTimeBonus() {
+    const rawBonus = this.remainingTime * this.playSettings.scoreMultiplier * 7;
+    return Math.max(0, Math.floor(rawBonus / 10) * 10);
   }
 
   addScore(baseScore) {
