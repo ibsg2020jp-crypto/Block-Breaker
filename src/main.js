@@ -1,16 +1,16 @@
 import { STAGES } from "./stages.js";
 import { Game } from "./game.js";
 import { formatDecimal, formatTime } from "./physics.js";
-import { fetchRanking, sanitizePlayerName, submitScore } from "./ranking.js";
+import { fetchRanking, sanitizePlayerName, submitScore, updatePlayerName } from "./ranking.js";
 import {
   ACHIEVEMENTS,
   getDifficultyConfig,
   loadSave,
-  makeRecordKey,
   normalizeSpeedMultiplier,
   recordStageClear,
   recordStageFail,
   resetSave,
+  updatePlayerProfile,
   updateSettings,
   updateSoundSetting
 } from "./storage.js";
@@ -24,6 +24,7 @@ const canvas = $("gameCanvas");
 let save = loadSave();
 let currentStageIndex = 0;
 let latestClearResult = null;
+let stageBestRequestId = 0;
 const audio = new SoundSystem(save.settings.sound);
 
 const game = new Game(canvas, {
@@ -113,8 +114,13 @@ function bindButtons() {
     await submitLatestScore();
   });
 
-  $("playerNameInput").addEventListener("input", (event) => {
+  $("playerNameSettingInput").addEventListener("input", (event) => {
     event.target.value = sanitizePlayerName(event.target.value);
+    $("playerNameStatus").textContent = "";
+  });
+
+  $("savePlayerNameButton").addEventListener("click", async () => {
+    await savePlayerNameSetting();
   });
 
   $("rankingStageSelect").addEventListener("change", () => {
@@ -153,7 +159,7 @@ function bindButtons() {
   });
 
   $("resetSaveButton").addEventListener("click", () => {
-    const ok = confirm("進行状況・ベストタイム・実績・設定をリセットしますか？");
+    const ok = confirm("進行状況・ベストタイム・実績・設定・プレイヤー情報をリセットしますか？");
     if (!ok) return;
     save = resetSave();
     audio.setEnabled(save.settings.sound);
@@ -293,16 +299,16 @@ function renderScoreSubmit(cleared, result, stage, difficulty) {
   }
 
   box.hidden = false;
-  $("scoreSubmitSummary").textContent = `${stage.name} / ${difficulty.label} / ${normalizeSpeedMultiplier(result.settings?.ballSpeedMultiplier).toFixed(1)}x / ${result.score.toLocaleString()}点`;
+  $("scoreSubmitSummary").textContent = `${save.player.name} として登録：${stage.name} / ${difficulty.label} / ${normalizeSpeedMultiplier(result.settings?.ballSpeedMultiplier).toFixed(1)}x / ${result.score.toLocaleString()}点`;
   $("scoreSubmitStatus").textContent = "";
   $("submitScoreButton").disabled = false;
 }
 
 async function submitLatestScore() {
   if (!latestClearResult) return;
-  const name = sanitizePlayerName($("playerNameInput").value);
+  const name = sanitizePlayerName(save.player.name);
   if (!name) {
-    $("scoreSubmitStatus").textContent = "名前は英数字1〜10文字で入力してください。";
+    $("scoreSubmitStatus").textContent = "設定画面で名前を入力してください。";
     return;
   }
 
@@ -313,6 +319,7 @@ async function submitLatestScore() {
 
   try {
     await submitScore(RANKING_API_URL, {
+      playerId: save.player.id,
       name,
       score: latestClearResult.score,
       stageId: stage.id,
@@ -341,6 +348,7 @@ function updateHud(stats) {
 
 function renderStageList() {
   const list = $("stageList");
+  const requestId = ++stageBestRequestId;
   list.innerHTML = "";
 
   STAGES.forEach((stage, index) => {
@@ -353,6 +361,7 @@ function renderStageList() {
       <span class="stage-card__number">${unlocked ? `Stage ${stage.id}` : "Locked"}</span>
       <strong>${stage.name}</strong>
       <span>${unlocked ? getStageSummary(record) : "前のステージをクリアすると開放"}</span>
+      ${unlocked ? `<small data-global-record="${stage.id}">全体最高: 読み込み中...</small>` : ""}
     `;
     button.addEventListener("click", () => {
       audio.play("click");
@@ -360,20 +369,35 @@ function renderStageList() {
     });
     list.appendChild(button);
   });
+
+  loadStageGlobalBests(requestId);
 }
 
 function getStageSummary(record) {
-  if (!record.cleared) return "未クリア";
-  const currentKey = makeRecordKey(save.settings);
-  const currentRecord = record.records?.[currentKey];
-  const overallScore = record.bestScore == null ? "-" : record.bestScore.toLocaleString();
-  const overallTime = record.bestTime == null ? "-" : formatDecimal(record.bestTime);
+  if (!record.cleared) return "プレイヤー最高: 未クリア";
+  const score = record.bestScore == null ? "-" : record.bestScore.toLocaleString();
+  const time = record.bestTime == null ? "-" : formatDecimal(record.bestTime);
+  return `プレイヤー最高: ${score}点 / ${time}`;
+}
 
-  if (currentRecord) {
-    return `現在設定: ${currentRecord.bestScore.toLocaleString()}点 / ${formatDecimal(currentRecord.bestTime)}｜総合: ${overallScore}点 / ${overallTime}`;
-  }
+async function loadStageGlobalBests(requestId) {
+  await Promise.all(
+    STAGES.map(async (stage) => {
+      const target = document.querySelector(`[data-global-record="${stage.id}"]`);
+      if (!target) return;
 
-  return `現在設定: 未記録｜総合: ${overallScore}点 / ${overallTime}`;
+      try {
+        const data = await fetchRanking(RANKING_API_URL, { stageId: stage.id, limit: 1 });
+        if (requestId !== stageBestRequestId) return;
+        const top = data.ranking?.[0];
+        target.textContent = top ? `全体最高: ${Number(top.score).toLocaleString()}点 / ${escapeHtml(top.name)}` : "全体最高: まだ記録なし";
+      } catch (error) {
+        if (requestId !== stageBestRequestId) return;
+        console.warn("全体最高記録を読み込めませんでした。", error);
+        target.textContent = "";
+      }
+    })
+  );
 }
 
 function renderAchievements() {
@@ -396,11 +420,35 @@ function renderSettings() {
   const difficulty = getDifficultyConfig(save.settings);
   const speed = normalizeSpeedMultiplier(save.settings.ballSpeedMultiplier);
 
+  $("playerIdText").textContent = save.player.id;
+  $("playerNameSettingInput").value = save.player.name;
+  $("playerNameStatus").textContent = "";
   $("soundToggle").checked = Boolean(save.settings.sound);
   $("difficultySelect").value = difficulty.id;
   $("difficultyDescription").textContent = `制限時間 ${difficulty.timeMultiplier}x / パドル ${difficulty.paddleMultiplier}x / スコア ${difficulty.scoreMultiplier}x`;
   $("ballSpeedRange").value = speed.toFixed(1);
   $("ballSpeedValue").textContent = `${speed.toFixed(1)}x`;
+}
+
+async function savePlayerNameSetting() {
+  const name = sanitizePlayerName($("playerNameSettingInput").value);
+  if (!name) {
+    $("playerNameStatus").textContent = "名前は英数字1〜10文字で入力してください。";
+    return;
+  }
+
+  save = updatePlayerProfile(save, { name });
+  $("playerNameSettingInput").value = save.player.name;
+  $("playerNameStatus").textContent = "名前を保存しました。";
+  audio.play("click");
+
+  try {
+    await updatePlayerName(RANKING_API_URL, { playerId: save.player.id, name: save.player.name });
+    $("playerNameStatus").textContent = "名前を保存し、ランキングにも反映しました。";
+  } catch (error) {
+    console.warn(error);
+    $("playerNameStatus").textContent = "名前を保存しました。ランキング側の反映にはAPI側の対応が必要です。";
+  }
 }
 
 function renderRankingStageSelect(selectedStageId = Number($("rankingStageSelect")?.value) || 0) {
@@ -440,7 +488,7 @@ async function loadRanking(stageId = Number($("rankingStageSelect").value) || 0)
       .join("");
   } catch (error) {
     console.error(error);
-    $("rankingStatus").textContent = "ランキングを読み込めませんでした。Apps Scriptの公開設定を確認してください。";
+    $("rankingStatus").textContent = "ランキングを読み込めませんでした。時間をおいて再試行してください。";
   }
 }
 
